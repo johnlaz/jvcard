@@ -234,7 +234,7 @@ canvas{display:none;}
 </div>
 
 <div class="panel" id="tab-ledger">
-  <div class="section-header"><h2>KEY LEDGER</h2><button class="ghost-btn" onclick="clearExpired()">Clear Expired</button></div>
+  <div class="section-header"><h2>KEY LEDGER</h2><span style="display:flex;gap:8px;align-items:center;"><button class="ghost-btn" onclick="exportLedger()">Export</button><label class="ghost-btn" style="cursor:pointer;margin:0;">Import<input type="file" accept=".json" style="display:none" onchange="importLedger(event)"></label><button class="ghost-btn" onclick="clearExpired()">Clear Expired</button></span></div>
   <div class="stats-row" id="ledgerStats"></div>
   <div id="ledgerBody"></div>
 </div>
@@ -317,6 +317,34 @@ function clearExpired() {
   var now = new Date();
   saveLedger(getLedger().filter(function(e){return new Date(e.expiresAt)>now;}));
   renderLedger();
+}
+function exportLedger() {
+  var data = JSON.stringify(getLedger(), null, 2);
+  var blob = new Blob([data], {type: 'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'jvkeys-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importLedger(event) {
+  var file = event.target.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var imported = JSON.parse(e.target.result);
+      if (!Array.isArray(imported)) { alert('Invalid backup file.'); return; }
+      var current = getLedger();
+      var existingIds = new Set(current.map(function(x){return x.id;}));
+      var merged = current.concat(imported.filter(function(x){return !existingIds.has(x.id);}));
+      saveLedger(merged);
+      renderLedger();
+      alert('Imported ' + (merged.length - current.length) + ' new entries.');
+    } catch(err) { alert('Failed to parse backup file.'); }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
 }
 function regenEntry(id) {
   var e = getLedger().find(function(x){return x.id===id;}); if (!e) return;
